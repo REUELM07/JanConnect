@@ -1,0 +1,6 @@
+{
+  "name": "JanConnect AI",
+  "description": "AI-powered citizen digital services platform for policy research, complaint filing, document intelligence, and government applications.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
