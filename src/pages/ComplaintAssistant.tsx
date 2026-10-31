@@ -25,11 +25,14 @@ import { BrowserAutomationPanel } from '../components/BrowserAutomationPanel';
 import { PrintReceiptModal } from '../components/PrintReceiptModal';
 import { VoiceInputModal } from '../components/VoiceInputModal';
 
+import { CivicCopilotEngine } from '../components/CivicCopilotEngine';
+
 interface ComplaintAssistantProps {
   language: Language;
   initialQuery?: string;
   initialBillData?: any;
-  onNavigateTab: (tab: string) => void;
+  onNavigateTab: (tab: string, stateData?: any) => void;
+  onOpenDocModal?: () => void;
 }
 
 export const ComplaintAssistant: React.FC<ComplaintAssistantProps> = ({
@@ -37,8 +40,12 @@ export const ComplaintAssistant: React.FC<ComplaintAssistantProps> = ({
   initialQuery = '',
   initialBillData,
   onNavigateTab,
+  onOpenDocModal,
 }) => {
   const t = translations[language];
+
+  // Engine Mode: Civic Copilot (Autonomous 3-Portal Engine) vs Standard Form
+  const [activeEngineMode, setActiveEngineMode] = useState<'copilot' | 'standard'>('copilot');
 
   // Citizen Input Step
   const [statement, setStatement] = useState(
@@ -182,22 +189,71 @@ export const ComplaintAssistant: React.FC<ComplaintAssistantProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Page Title */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-700">
-          <AlertCircle className="w-4 h-4 text-amber-600" />
-          <span>Statutory Grievance Redressal Mechanism</span>
+      {/* Mode Switcher Banner: Civic Copilot vs Standard Form */}
+      <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setActiveEngineMode('copilot')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeEngineMode === 'copilot'
+                ? 'bg-[#0e3b6c] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Sparkles className={`w-4 h-4 ${activeEngineMode === 'copilot' ? 'text-amber-300' : 'text-slate-500'}`} />
+            <span>JanConnect Civic Copilot</span>
+            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.2 rounded bg-amber-400 text-slate-900 ml-1">
+              Autonomous Auto-Filing
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveEngineMode('standard')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeEngineMode === 'standard'
+                ? 'bg-[#0e3b6c] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Standard Grievance Form</span>
+          </button>
         </div>
-        <h1 className="text-2xl font-extrabold text-[#0e3b6c] tracking-tight">
-          {t.complaint.heading}
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 max-w-3xl">
-          {t.complaint.subheading}
-        </p>
+
+        <div className="text-xs text-slate-500 px-3 hidden lg:flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>Statutory 3-Portal Engine: CPGRAMS, RTI Online, Local Discom/Utility</span>
+        </div>
       </div>
 
-      {/* Success Notification & Reference Card */}
-      {submittedRecord ? (
+      {activeEngineMode === 'copilot' ? (
+        <CivicCopilotEngine
+          language={language}
+          initialQuery={statement}
+          initialBillData={initialBillData}
+          onNavigateTab={onNavigateTab}
+          onOpenDocModal={onOpenDocModal}
+        />
+      ) : (
+        <>
+          {/* Page Title */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-700">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <span>Statutory Grievance Redressal Mechanism</span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-[#0e3b6c] tracking-tight">
+              {t.complaint.heading}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-3xl">
+              {t.complaint.subheading}
+            </p>
+          </div>
+
+          {/* Success Notification & Reference Card */}
+          {submittedRecord ? (
         <div className="bg-white rounded-xl border-2 border-emerald-500 shadow-md p-6 space-y-6 animate-in fade-in duration-200">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div className="flex items-center gap-3">
@@ -702,6 +758,8 @@ export const ComplaintAssistant: React.FC<ComplaintAssistantProps> = ({
             </form>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* Printable Receipt Modal */}

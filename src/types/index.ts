@@ -32,6 +32,49 @@ export interface ComplaintRecord {
   automationJobId?: string;
 }
 
+export type TargetPortalType = 'CPGRAMS' | 'RTI_ONLINE' | 'LOCAL_UTILITY';
+
+export interface CivicCopilotEntities {
+  citizenName: string;
+  locationOrSector: string;
+  consumerAccountNo: string | null;
+  meterReadingOrUnits: string | null;
+  disputedAmount: string | null;
+  coreIssue: string;
+}
+
+export interface CivicCopilotResult {
+  targetPortal: TargetPortalType;
+  portalName: string;
+  portalUrl: string;
+  portalRationale: string;
+  entities: CivicCopilotEntities;
+  legalAct: string;
+  statutorySLA: string;
+  slaCategory: string;
+  sectionA_Advisory: {
+    language: string;
+    acknowledgment: string;
+    assignedAuthority: string;
+    legalDeadlineSLA: string;
+    helplineAndOffice: string;
+    nextStep: string;
+  };
+  sectionB_AutoFill: {
+    targetPortalId: TargetPortalType;
+    portalName: string;
+    portalUrl: string;
+    legalPetitionDraft: string;
+    formFieldMap: Array<{
+      fieldName: string;
+      fieldLabel: string;
+      value: string;
+      domSelector?: string;
+      category: 'identity' | 'account' | 'grievance' | 'security';
+    }>;
+  };
+}
+
 export interface ComplaintAnalysisResult {
   category: string;
   subcategory: string;

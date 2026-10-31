@@ -3,11 +3,25 @@ import {
   ComplaintAnalysisResult, 
   ComplaintRecord, 
   AutomationJob, 
-  DocumentAnalysisResult 
+  DocumentAnalysisResult,
+  CivicCopilotResult
 } from '../types';
 
 export const api = {
-  // 1. AI Chat & Policy Guidance
+  // 1. JanConnect Civic Copilot Autonomous Engine
+  async processCivicCopilot(text: string, language: string = 'en', billData?: any): Promise<{ success: boolean; result: CivicCopilotResult }> {
+    const res = await fetch('/api/copilot/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language, billData }),
+    });
+    if (!res.ok) {
+      throw new Error(`Server returned ${res.status}`);
+    }
+    return res.json();
+  },
+
+  // 1b. AI Chat & Policy Guidance
   async askQuery(query: string, language: string = 'en'): Promise<ChatResponse> {
     const res = await fetch('/api/chat', {
       method: 'POST',

@@ -244,6 +244,129 @@ Never invent imaginary portals. Always cite authentic Indian government bodies.`
   }
 });
 
+// 1c. JanConnect Civic Copilot Autonomous Public Grievance Navigation & Auto-Filing Engine
+app.post('/api/copilot/process', async (req: Request, res: Response) => {
+  try {
+    const { text, language = 'en', billData } = req.body;
+    const citizenInput = (text || billData?.problemDescription || '').trim();
+    if (!citizenInput && !billData) {
+      return res.status(400).json({ error: 'Citizen narration or document data is required' });
+    }
+
+    const lang = language === 'hi' ? 'hi' : language === 'pa' ? 'pa' : 'en';
+
+    const systemPrompt = `You are JanConnect Civic Copilot — an autonomous public grievance navigation and auto-filing engine designed for Indian citizens.
+Your job is to eliminate manual form-filling. When a citizen speaks or writes their problem in any Indian language (Hindi, Punjabi, Hinglish, English) or provides a bill/document photo, you must:
+1. Understand the exact problem and identify the citizen's details.
+2. Select the correct portal among the 3 supported portals:
+   - Portal 1: CPGRAMS (pgportal.gov.in) — Central ministries, pensions, banking, railways, telecom, passports.
+   - Portal 2: RTI Online (rtionline.gov.in) — Requests for official government records and accountability.
+   - Portal 3: Local Utility & Discom Portal (e-Sampark / State Electricity & Water Boards) — High bills, meter faults, power cuts, water shortages, sewage leaks.
+3. Automatically draft the formal, legally worded complaint or RTI application.
+4. Output the exact form-field data required to auto-fill the target website.
+5. Provide a simple, citizen-friendly explanation with the legal resolution deadline (SLA).
+
+STEP 1: INTAKE & ENTITY EXTRACTION
+Extract:
+- CITIZEN_NAME: Full name (if mentioned, otherwise default to "Citizen")
+- LOCATION_OR_SECTOR: Sector, ward, colony, or city mentioned (e.g. Sector 22, Manimajra)
+- CONSUMER_ACCOUNT_NO: Any CA Number, Consumer ID, or Account Number from utility bills
+- METER_READING_OR_UNITS: Previous/Current readings or units consumed (if applicable)
+- DISPUTED_AMOUNT: Any abnormal bill amount or financial loss mentioned
+- CORE_ISSUE: 1-sentence summary of the grievance
+
+STEP 2: TARGET PORTAL SELECTION
+Evaluate the issue and assign ONLY ONE target portal:
+- "CPGRAMS": Central government, national banks, pension funds, railways, post offices, national highways, or passports.
+- "RTI_ONLINE": Demanding official records, government expenditure details, tender copies, exam sheets, or project status.
+- "LOCAL_UTILITY": Domestic electricity, water supply, smart meters, power outages, sewer blockages, potholes, or streetlights.
+
+STEP 3: LEGAL GROUNDING & STATUTORY SLA
+- CPGRAMS: Department of Administrative Reforms & Public Grievances (DARPG) — Standard 30-day resolution timeline.
+- RTI ONLINE: Right to Information Act 2005 (Section 6 & 7) — Mandatory 30-day reply deadline (48 hours if concerning life/liberty).
+- LOCAL UTILITY: Punjab Right to Service Act 2011 / State Discom Charter:
+  * Power Outage: 4 Hours
+  * Burnt/Faulty Transformer: 24 to 72 Hours
+  * Water Pipeline Leakage / Contamination: 24 to 48 Hours
+  * Disputed Water / Power Bill: 15 Working Days
+  * Streetlights & Potholes: 3 to 7 Working Days
+
+STEP 4: OUTPUT FORMAT
+Return ONLY a valid JSON object matching this schema:
+{
+  "targetPortal": "CPGRAMS" | "RTI_ONLINE" | "LOCAL_UTILITY",
+  "portalName": string,
+  "portalUrl": string,
+  "portalRationale": string,
+  "entities": {
+    "citizenName": string,
+    "locationOrSector": string,
+    "consumerAccountNo": string | null,
+    "meterReadingOrUnits": string | null,
+    "disputedAmount": string | null,
+    "coreIssue": string
+  },
+  "legalAct": string,
+  "statutorySLA": string,
+  "slaCategory": string,
+  "sectionA_Advisory": {
+    "language": string,
+    "acknowledgment": string,
+    "assignedAuthority": string,
+    "legalDeadlineSLA": string,
+    "helplineAndOffice": string,
+    "nextStep": string
+  },
+  "sectionB_AutoFill": {
+    "targetPortalId": "CPGRAMS" | "RTI_ONLINE" | "LOCAL_UTILITY",
+    "portalName": string,
+    "portalUrl": string,
+    "legalPetitionDraft": string,
+    "formFieldMap": [
+      {
+        "fieldName": string,
+        "fieldLabel": string,
+        "value": string,
+        "domSelector": string,
+        "category": "identity" | "account" | "grievance" | "security"
+      }
+    ]
+  }
+}`;
+
+    let parsedResult;
+    try {
+      if (!hasValidGeminiKey) {
+        throw new Error('Using deterministic civic copilot engine');
+      }
+
+      const promptContext = `Citizen Problem Narration: "${citizenInput}"\nLanguage: ${lang}\nBill Context Data: ${JSON.stringify(billData || {})}`;
+      const response = await withTimeout(ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: promptContext,
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: 'application/json',
+        },
+      }), 8000);
+
+      const textOutput = response.text || '{}';
+      parsedResult = JSON.parse(textOutput);
+    } catch (err: any) {
+      console.warn('Civic copilot AI fallback:', err?.message);
+      parsedResult = generateCivicCopilotFallback(citizenInput, lang, billData);
+    }
+
+    res.json({
+      success: true,
+      result: parsedResult,
+    });
+  } catch (error: any) {
+    console.error('Civic copilot error:', error);
+    res.status(500).json({ error: 'Failed to process copilot navigation' });
+  }
+});
+
 // 2. Core Feature: AI Complaint Analysis & Entity Extraction
 app.post('/api/complaint/analyze', async (req: Request, res: Response) => {
   try {
@@ -1014,6 +1137,194 @@ Prayer for Relief:
 Yours sincerely,
 A Conscientious Citizen`,
     citizenActionSummary: `We have classified your issue under ${cat}. Fill in your consumer number to review the formal petition and prepare for submission.`
+  };
+}
+
+function generateCivicCopilotFallback(citizenInput: string, lang: string, billData?: any) {
+  const l = citizenInput.toLowerCase();
+
+  // STEP 1: ENTITY EXTRACTION
+  const nameMatch = citizenInput.match(/(?:my name is|i am|naam|mera naam|shri|smt)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
+  const citizenName = nameMatch ? nameMatch[1].trim() : (billData?.consumerDetails?.consumerId ? 'Consumer' : 'Citizen');
+
+  const sectorMatch = citizenInput.match(/(?:sector|sec|ward|colony|mohalla|pind|village|nagar|road|phase)\s*([0-9a-zA-Z\s]+?)(?:,|\.|\b|in|near)/i) ||
+                      citizenInput.match(/(manimajra|ludhiana|dwarka|mohali|chandigarh|amritsar|jalandhar|delhi|patiala)/i);
+  const locationOrSector = sectorMatch ? sectorMatch[0].trim() : (billData ? 'Sector 22 / Sub-Division' : 'Urban Revenue Ward');
+
+  const caMatch = citizenInput.match(/(?:ca|k-no|account|consumer|id|number|no)[\s#:.-]*([0-9]{6,14})/i);
+  const consumerAccountNo = caMatch ? caMatch[1] : (billData?.consumerDetails?.consumerId || null);
+
+  const unitsMatch = citizenInput.match(/([0-9]+)\s*(?:units|kwh|kl|litres|reading)/i);
+  const meterReadingOrUnits = unitsMatch ? `${unitsMatch[1]} Units` : (billData?.consumerDetails?.unitsConsumed || null);
+
+  const amtMatch = citizenInput.match(/(?:₹|rs\.?|inr)\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)/i) ||
+                   citizenInput.match(/([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)\s*(?:rupees|rs)/i) ||
+                   citizenInput.match(/(?:amount|bill|disputed|fine|charge|dues)[\s:of₹]*([0-9]{3,7})/i);
+  const disputedAmount = amtMatch 
+    ? (amtMatch[0].startsWith('₹') ? amtMatch[0] : (amtMatch[1] ? `₹${amtMatch[1]}` : `₹${amtMatch[0]}`)) 
+    : (billData?.consumerDetails?.currentAmount || null);
+
+  const coreIssue = citizenInput.length > 10 ? citizenInput.split('.')[0].trim() : 'Public service disruption grievance';
+
+  // STEP 2: TARGET PORTAL SELECTION (CPGRAMS vs RTI_ONLINE vs LOCAL_UTILITY)
+  let targetPortal: 'CPGRAMS' | 'RTI_ONLINE' | 'LOCAL_UTILITY' = 'LOCAL_UTILITY';
+  let portalName = 'Local Utility & Discom Portal (e-Sampark / State Electricity & Water Boards)';
+  let portalUrl = 'https://connect.punjab.gov.in';
+  let portalRationale = 'Grievance involves domestic utility supply, meter readings, billing anomalies, or civic infrastructure.';
+
+  const isRTI = l.includes('rti') || l.includes('right to information') || l.includes('records') || 
+                l.includes('tender') || l.includes('expenditure') || l.includes('answer sheet') || 
+                l.includes('marksheet copy') || l.includes('funds allocated') || l.includes('audit report') || 
+                l.includes('project status') || l.includes('delay reason');
+
+  const isCentral = l.includes('bank') || l.includes('pension') || l.includes('railway') || 
+                    l.includes('irctc') || l.includes('passport') || l.includes('post office') || 
+                    l.includes('highway') || l.includes('nhai') || l.includes('central') || 
+                    l.includes('epfo') || l.includes('telecom') || l.includes('bsnl') || 
+                    l.includes('income tax') || l.includes('sbi') || l.includes('rbi');
+
+  if (isRTI) {
+    targetPortal = 'RTI_ONLINE';
+    portalName = 'RTI Online Central Gateway (rtionline.gov.in)';
+    portalUrl = 'https://rtionline.gov.in';
+    portalRationale = 'Citizen is requesting official government records, tender copies, or project status under statutory transparency mandates.';
+  } else if (isCentral) {
+    targetPortal = 'CPGRAMS';
+    portalName = 'CPGRAMS Central Gateway (pgportal.gov.in)';
+    portalUrl = 'https://pgportal.gov.in';
+    portalRationale = 'Issue involves a Central Government Ministry, nationalized bank, pension fund, railway, post office, or national highway.';
+  }
+
+  // STEP 3: LEGAL GROUNDING & STATUTORY SLA
+  let legalAct = 'Punjab Right to Service Act 2011 / State Discom Charter';
+  let statutorySLA = '15 Working Days';
+  let slaCategory = 'Disputed Utility Bill Rectification';
+  let assignedAuthority = 'Executive Engineer / Sub-Divisional Officer';
+  let helplineNumber = '1916 (Water) / 1912 (Electricity)';
+
+  if (targetPortal === 'CPGRAMS') {
+    legalAct = 'Department of Administrative Reforms & Public Grievances (DARPG) Resolution & Citizen\'s Charter';
+    statutorySLA = '30 Calendar Days';
+    slaCategory = 'Central Public Grievance Resolution Standard';
+    assignedAuthority = 'Nodal Public Grievance Officer, Central Administrative Cell';
+    helplineNumber = '1800-11-4000 (CPGRAMS National Toll-Free)';
+  } else if (targetPortal === 'RTI_ONLINE') {
+    legalAct = 'Right to Information Act, 2005 (Section 6 & 7)';
+    statutorySLA = l.includes('life') || l.includes('liberty') ? '48 Hours (Concerning Life or Liberty)' : '30 Calendar Days';
+    slaCategory = 'Statutory Information Disclosure SLA';
+    assignedAuthority = 'Central Public Information Officer (CPIO)';
+    helplineNumber = '011-24622690 (RTI Helpdesk)';
+  } else {
+    // Local Utility Sub-SLA categorization
+    if (l.includes('power cut') || l.includes('outage') || l.includes('no power') || l.includes('light nahi')) {
+      legalAct = 'Electricity (Rights of Consumers) Rules 2020 / Punjab Right to Service Act 2011';
+      statutorySLA = '4 Hours (Urban) / 8 Hours (Rural)';
+      slaCategory = 'Power Outage Restoration SLA';
+      assignedAuthority = 'Sub-Divisional Officer (Operation), State Power Corporation Ltd';
+      helplineNumber = '1912 (24x7 Power Emergency Helpline)';
+    } else if (l.includes('transformer') || l.includes('blast') || l.includes('burnt')) {
+      legalAct = 'State Discom Standards of Performance & RTS Act';
+      statutorySLA = '24 to 72 Hours';
+      slaCategory = 'Transformer Replacement & Feeder Repair SLA';
+      assignedAuthority = 'Executive Engineer (Distribution), Sub-Station Wing';
+      helplineNumber = '1912 (Discom Grid Control Room)';
+    } else if (l.includes('leak') || l.includes('contamination') || l.includes('ganda paani') || l.includes('pipe burst')) {
+      legalAct = 'Punjab Right to Service Act 2011 / Water Supply Regulations';
+      statutorySLA = '24 to 48 Hours';
+      slaCategory = 'Water Contamination & Pipeline Leakage SLA';
+      assignedAuthority = 'Sub-Divisional Engineer, Water Supply & Sewerage Division';
+      helplineNumber = '1800-180-2468 (Water Quality Call Centre)';
+    } else if (l.includes('street light') || l.includes('pothole') || l.includes('road') || l.includes('garbage')) {
+      legalAct = 'Municipal Corporation Act / Citizen Service Charter';
+      statutorySLA = '3 to 7 Working Days';
+      slaCategory = 'Civic Infrastructure Repair SLA';
+      assignedAuthority = 'Executive Engineer (Civil & Electrical), Municipal Corporation';
+      helplineNumber = '1800-180-4104 (Municipal Citizen Helpline)';
+    } else {
+      legalAct = 'Punjab Right to Service Act 2011 & Consumer Protection Regulations Rule 14';
+      statutorySLA = '15 Working Days';
+      slaCategory = 'Disputed Utility Bill Resolution SLA';
+      assignedAuthority = 'Revenue Officer (Commercial), Sub-Divisional Office';
+      helplineNumber = '1915 (National Consumer Helpline)';
+    }
+  }
+
+  // STEP 4: OUTPUT FORMAT (SECTION A & SECTION B)
+  // Section A: Citizen Friendly Advisory in native language
+  let acknowledgment = `We have analyzed your problem regarding "${coreIssue}" in ${locationOrSector}. Your grievance docket is drafted and assigned to the competent public authority.`;
+  let advisoryAuthority = `Assigned Authority: ${assignedAuthority}`;
+  let advisoryDeadline = `Legal Resolution Deadline: Under the statutory provisions of ${legalAct}, the authority is mandated to resolve your case within ${statutorySLA}.`;
+  let advisoryHelpline = `Helpline: ${helplineNumber} | Local Office: Sub-Divisional Redressal Forum, ${locationOrSector}.`;
+  let advisoryNextStep = `Next Step: The official form payload has been prepared for auto-filling into ${portalName}. When you launch the guided automation, you will only need to enter the security CAPTCHA/OTP when prompted.`;
+
+  if (lang === 'hi') {
+    acknowledgment = `हमने आपकी समस्या "${coreIssue}" (स्थान: ${locationOrSector}) का विश्लेषण कर लिया है। आपकी औपचारिक शिकायत याचिका तैयार कर संबंधित विभाग को प्रेषित कर दी गई है।`;
+    advisoryAuthority = `उत्तरदायी प्राधिकारी: ${assignedAuthority}`;
+    advisoryDeadline = `विधिक समय-सीमा (SLA): ${legalAct} के तहत, संबंधित विभाग को यह कार्य ${statutorySLA} के भीतर अनिवार्य रूप से पूर्ण करना होगा।`;
+    advisoryHelpline = `हेल्पलाइन: ${helplineNumber} | क्षेत्रीय कार्यालय: उप-मंडलीय शिकायत निवारण केंद्र, ${locationOrSector}।`;
+    advisoryNextStep = `अगला कदम: ${portalName} के लिए आवेदन पत्र स्वचालित रूप से भर दिया गया है। जब आप ऑटोमेशन प्रारंभ करेंगे, तब आपको केवल सुरक्षा कैप्चा/ओटीपी दर्ज करना होगा।`;
+  } else if (lang === 'pa') {
+    acknowledgment = `ਅਸੀਂ "${coreIssue}" (ਖੇਤਰ: ${locationOrSector}) ਬਾਰੇ ਤੁਹਾਡੀ ਸ਼ਿਕਾਇਤ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰ ਲਿਆ ਹੈ। ਤੁਹਾਡੀ ਰਸਮੀ ਪਟੀਸ਼ਨ ਤਿਆਰ ਕਰਕੇ ਸਬੰਧਤ ਵਿਭਾਗ ਨੂੰ ਭੇਜੀ ਜਾ ਰਹੀ ਹੈ।`;
+    advisoryAuthority = `ਜ਼ਿੰਮੇਵਾਰ ਅਧਿਕਾਰੀ: ${assignedAuthority}`;
+    advisoryDeadline = `ਕਾਨੂੰਨੀ ਸਮਾਂ-ਸੀਮਾ (SLA): ${legalAct} ਅਧੀਨ, ਵਿਭਾਗ ਲਈ ਇਸ ਦਾ ਹੱਲ ${statutorySLA} ਦੇ ਅੰਦਰ ਕਰਨਾ ਕਾਨੂੰਨੀ ਤੌਰ 'ਤੇ ਲਾਜ਼ਮੀ ਹੈ।`;
+    advisoryHelpline = `ਹੈਲਪਲਾਈਨ: ${helplineNumber} | ਸਥਾਨਕ ਦਫ਼ਤਰ: ਉਪ-ਮੰਡਲ ਲੋਕ ਸ਼ਿਕਾਇਤ ਨਿਵਾਰਨ ਫੋਰਮ, ${locationOrSector}।`;
+    advisoryNextStep = `ਅਗਲਾ ਕਦਮ: ${portalName} ਲਈ ਫਾਰਮ ਤਿਆਰ ਹੈ। ਆਟੋਮੇਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ 'ਤੇ ਤੁਹਾਨੂੰ ਸਿਰਫ਼ ਸੁਰੱਖਿਆ ਕੈਪਚਾ/ਓਟੀਪੀ ਭਰਨਾ ਪਵੇਗਾ।`;
+  }
+
+  // Section B: Formal Legal Petition Text & Form-Field Map
+  let legalPetitionDraft = '';
+  if (targetPortal === 'RTI_ONLINE') {
+    legalPetitionDraft = `To,\nThe Central Public Information Officer (CPIO) / Public Authority,\nRight to Information Act, 2005.\n\nSubject: Formal Application for Information under Section 6(1) of the RTI Act, 2005.\n\nRespected Sir/Madam,\n\nI, ${citizenName}, residing at ${locationOrSector}, hereby seek the following official records and certified documentation:\n\n1. Certified copy of work orders, expenditure ledger, and sanctioned fund allocation regarding: ${coreIssue}.\n2. Certified copies of the site inspection reports, junior engineer survey logs, and daily progress register.\n3. Detailed reasons for the delay in completion/resolution along with names of nodal officers responsible.\n\nI confirm that I am a Citizen of India and have tendered the statutory application fee. As per Section 7(1) of the RTI Act, kindly provide the requested information within 30 days.\n\nYours faithfully,\n${citizenName}\nLocation: ${locationOrSector}`;
+  } else if (targetPortal === 'CPGRAMS') {
+    legalPetitionDraft = `To,\nThe Central Nodal Grievance Redressal Officer,\nDepartment of Administrative Reforms & Public Grievances (CPGRAMS),\nGovernment of India.\n\nSubject: Public Grievance regarding ${coreIssue} - Request for immediate intervention.\n\nRespected Sir/Madam,\n\nI am writing to register a formal grievance against deficiency of service:\n\nFacts of the Case:\nComplainant: ${citizenName}\nLocation/Address: ${locationOrSector}\nAccount/Reference: ${consumerAccountNo || 'Not Applicable'}\nDisputed Demand/Loss: ${disputedAmount || 'Service Disruption'}\n\nSummary:\n${citizenInput}\n\nUnder the Citizen's Charter and administrative accountability guidelines, this matter warrants priority investigation and disposal within the 30-day statutory timeline.\n\nYours faithfully,\n${citizenName}`;
+  } else {
+    legalPetitionDraft = `To,\nThe Executive Engineer / Sub-Divisional Officer,\nCompetent Public Utility Authority,\nState of Punjab / Local Municipal Jurisdiction.\n\nSubject: Formal Complaint under Punjab Right to Service Act 2011 regarding ${coreIssue}.\n\nRespected Sir/Madam,\n\nI am a bonafide consumer (${consumerAccountNo ? `Account ID: ${consumerAccountNo}` : 'Resident'}), residing at ${locationOrSector}.\n\nStatement of Facts:\n${citizenInput}\n\nKey Parameters:\n- Consumer ID: ${consumerAccountNo || 'Attached in documentation'}\n- Meter Reading/Units: ${meterReadingOrUnits || 'As per physical meter dial'}\n- Disputed Amount: ${disputedAmount || 'Nil'}\n\nStatutory Relief Sought:\n1. Immediate technical inspection of supply/meter.\n2. Stay on disconnection or penalties during dispute enquiry under Rule 14.\n3. Restoration of service / demand recalculation within the statutory RTS timeframe (${statutorySLA}).\n\nYours faithfully,\n${citizenName}\n${locationOrSector}`;
+  }
+
+  const formFieldMap = [
+    { fieldName: 'applicant_name', fieldLabel: 'Citizen / Applicant Full Name', value: citizenName, domSelector: 'input[name="applicant_name"], #txtName', category: 'identity' as const },
+    { fieldName: 'location_sector', fieldLabel: 'Sector / Ward / Address', value: locationOrSector, domSelector: 'textarea[name="address"], #txtAddress', category: 'identity' as const },
+    { fieldName: 'consumer_account_no', fieldLabel: 'Consumer Account ID / CA No', value: consumerAccountNo || 'N/A', domSelector: 'input[name="consumer_no"], #txtCANumber', category: 'account' as const },
+    { fieldName: 'disputed_amount', fieldLabel: 'Disputed Financial Amount', value: disputedAmount || 'N/A', domSelector: 'input[name="disputed_amt"]', category: 'account' as const },
+    { fieldName: 'meter_reading_units', fieldLabel: 'Meter Reading / Units', value: meterReadingOrUnits || 'N/A', domSelector: 'input[name="meter_units"]', category: 'account' as const },
+    { fieldName: 'assigned_department', fieldLabel: 'Competent Ministry / Discom', value: assignedAuthority, domSelector: 'select[name="ministry_cd"]', category: 'grievance' as const },
+    { fieldName: 'grievance_subject', fieldLabel: 'Grievance Subject', value: coreIssue.slice(0, 80), domSelector: 'input[name="subject"], #txtSubject', category: 'grievance' as const },
+    { fieldName: 'petition_legal_text', fieldLabel: 'Formally Worded Legal Petition', value: legalPetitionDraft.slice(0, 4000), domSelector: 'textarea[name="grievance_text"], #txtGrievance', category: 'grievance' as const },
+    { fieldName: 'statutory_sla', fieldLabel: 'Enforceable Resolution SLA', value: statutorySLA, domSelector: '#statutory_deadline', category: 'security' as const },
+    { fieldName: 'security_captcha', fieldLabel: 'Government CAPTCHA / OTP', value: '<Awaiting Citizen Verification>', domSelector: 'input[name="captcha"]', category: 'security' as const }
+  ];
+
+  return {
+    targetPortal,
+    portalName,
+    portalUrl,
+    portalRationale,
+    entities: {
+      citizenName,
+      locationOrSector,
+      consumerAccountNo,
+      meterReadingOrUnits,
+      disputedAmount,
+      coreIssue
+    },
+    legalAct,
+    statutorySLA,
+    slaCategory,
+    sectionA_Advisory: {
+      language: lang,
+      acknowledgment,
+      assignedAuthority: advisoryAuthority,
+      legalDeadlineSLA: advisoryDeadline,
+      helplineAndOffice: advisoryHelpline,
+      nextStep: advisoryNextStep
+    },
+    sectionB_AutoFill: {
+      targetPortalId: targetPortal,
+      portalName,
+      portalUrl,
+      legalPetitionDraft,
+      formFieldMap
+    }
   };
 }
 

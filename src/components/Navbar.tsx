@@ -142,6 +142,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-amber-700' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
+                  {item.id === 'complaint' && (
+                    <span className={`text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded tracking-wide ${
+                      isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-400 text-slate-950'
+                    }`}>
+                      Copilot
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -180,7 +187,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.id === 'complaint' && (
+                  <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
+                    Civic Copilot
+                  </span>
+                )}
               </button>
             );
           })}

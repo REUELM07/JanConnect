@@ -90,6 +90,7 @@ export default function App() {
             initialQuery={complaintInitialQuery}
             initialBillData={complaintInitialBillData}
             onNavigateTab={handleNavigateTab}
+            onOpenDocModal={() => setIsDocModalOpen(true)}
           />
         )}
 

@@ -220,7 +220,7 @@ export const Home: React.FC<HomeProps> = ({ language, onNavigateTab, onOpenDocMo
                     onClick={handleProceedToComplaintFromHome}
                     className="shrink-0 px-4 py-2.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <span>Proceed to File Official Complaint</span>
+                    <span>Launch Civic Copilot Auto-Filing</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -328,17 +328,25 @@ export const Home: React.FC<HomeProps> = ({ language, onNavigateTab, onOpenDocMo
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: File a Grievance */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between">
+            {/* Card 1: JanConnect Civic Copilot */}
+            <div className="bg-white rounded-xl border-2 border-amber-500/40 p-5 shadow-xs hover:border-amber-500 transition-all flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-amber-500 text-slate-900 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-bl">
+                Civic Copilot
+              </div>
               <div className="space-y-3">
                 <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
-                  <AlertCircle className="w-5 h-5" />
+                  <Sparkles className="w-5 h-5" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  AI-Powered Complaint Filing
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    Civic Copilot (Autonomous Auto-Filing)
+                  </h3>
+                  <span className="text-[10px] text-amber-800 font-semibold block">
+                    Zero-Manual Form Filling • 3 Statutory Portals
+                  </span>
+                </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Have a high water bill, power outage, or water supply disruption? Simply describe your issue in plain words. The AI detects the department and drafts the petition.
+                  Speak or type in Hindi, Punjabi, or English. The autonomous copilot extracts entities, selects the authoritative portal (CPGRAMS, RTI Online, or Local Discom), applies legal SLAs, and maps form fields.
                 </p>
               </div>
               <div className="pt-4 mt-2 border-t border-slate-100">
@@ -346,7 +354,7 @@ export const Home: React.FC<HomeProps> = ({ language, onNavigateTab, onOpenDocMo
                   onClick={() => onNavigateTab('complaint')}
                   className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <span>File a Complaint</span>
+                  <span>Launch Civic Copilot Engine</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
